@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Dungeon Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-title-section">
+                    <h1 class="title">
+                        Dungeon Manager
+                    </h1>
+                    <p class="subtitle">Master Your Dungeons & Dragons Adventures</p>
+                </div>
+                <div class="header-actions">
+                    <div id="user-info" style="display: none; margin-right: 15px;">
+                        <span id="username-display" style="color: var(--text-primary); margin-right: 10px;"></span>
+                        <button class="btn btn-secondary" id="logout-btn">Logout</button>
+                    </div>
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon">●</span>
+                        <span id="theme-toggle-text">Light</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <button class="nav-btn active" data-view="dungeons">
+                        <span>Dungeons</span>
+                    </button>
+                    <button class="nav-btn" data-view="search">
+                        <span>Search</span>
+                    </button>
+                    <button class="nav-btn" data-view="export">
+                        <span>Export</span>
+                    </button>
+                    <button class="nav-btn" data-view="characters">
+                        <span>Characters</span>
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Dungeons View -->
+                <div id="dungeons-view" class="view active">
+                    <div class="view-header">
+                        <h2 id="dungeons-view-title">Your Dungeons</h2>
+                        <button class="btn btn-primary" id="create-dungeon-btn">
+                            <span class="icon">+</span>
+                            Create Dungeon
+                        </button>
+                    </div>
+                    <div id="dungeons-list" class="cards-container">
+                        <!-- Dungeons will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Search View -->
+                <div id="search-view" class="view">
+                    <div class="view-header">
+                        <h2>Search Items</h2>
+                    </div>
+                    <div class="search-form">
+                        <input type="text" id="search-query" placeholder="Enter search query..." class="input">
+                        <select id="search-dungeon" class="input">
+                            <option value="">All Dungeons</option>
+                        </select>
+                        <input type="text" id="search-tags" placeholder="Tags (comma-separated)" class="input">
+                        <button class="btn btn-primary" id="search-btn">Search</button>
+                    </div>
+                    <div id="search-results" class="cards-container">
+                        <!-- Search results will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Export View -->
+                <div id="export-view" class="view">
+                    <div class="view-header">
+                        <h2>Export/Import Dungeons</h2>
+                    </div>
+                    <div class="export-section">
+                        <h3>Export Dungeon</h3>
+                        <select id="export-dungeon-select" class="input">
+                            <option value="">Select a dungeon...</option>
+                        </select>
+                        <button class="btn btn-primary" id="export-btn">Export</button>
+                        <pre id="export-output" class="export-output"></pre>
+                    </div>
+                    <div class="import-section">
+                        <h3>Import Dungeon</h3>
+                        <textarea id="import-data" class="input textarea" placeholder="Paste JSON dungeon data here..."></textarea>
+                        <select id="import-strategy" class="input">
+                            <option value="skip">Skip (if exists)</option>
+                            <option value="overwrite">Overwrite (if exists)</option>
+                            <option value="rename">Rename (if exists)</option>
+                        </select>
+                        <button class="btn btn-primary" id="import-btn">Import</button>
+                    </div>
+                </div>
+
+                <!-- Characters View -->
+                <div id="characters-view" class="view">
+                    <div class="view-header">
+                        <h2>Your Characters</h2>
+                        <button class="btn btn-primary" id="create-character-btn">
+                            <span class="icon">+</span>
+                            Create Character
+                        </button>
+                    </div>
+                    <div id="characters-list" class="cards-container">
+                        <!-- Characters will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Create Dungeon Modal -->
+    <div id="create-dungeon-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Dungeon</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-dungeon-form">
+                    <div class="form-group">
+                        <label for="dungeon-name">Dungeon Name</label>
+                        <input type="text" id="dungeon-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dungeon-summary">Summary (optional)</label>
+                        <textarea id="dungeon-summary" class="input textarea" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="dungeon-exists-ok">
+                            Allow overwriting existing dungeon
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Room Modal -->
+    <div id="create-room-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Room</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-room-form">
+                    <input type="hidden" id="room-dungeon-name">
+                    <div class="form-group">
+                        <label for="room-name">Room Name</label>
+                        <input type="text" id="room-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="room-summary">Summary (optional)</label>
+                        <textarea id="room-summary" class="input textarea" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Item Modal -->
+    <div id="create-item-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Item</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-item-form">
+                    <input type="hidden" id="item-dungeon-name">
+                    <input type="hidden" id="item-room-name">
+                    <div class="form-group">
+                        <label for="item-category">Category</label>
+                        <select id="item-category" class="input" required>
+                            <option value="">Select category...</option>
+                            <option value="puzzles">Puzzles</option>
+                            <option value="traps">Traps</option>
+                            <option value="treasures">Treasures</option>
+                            <option value="enemies">Enemies</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-name">Item Name</label>
+                        <input type="text" id="item-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-summary">Summary (optional)</label>
+                        <input type="text" id="item-summary" class="input">
+                    </div>
+                    <div class="form-group">
+                        <label for="item-notes">Notes (Markdown, optional)</label>
+                        <textarea id="item-notes" class="input textarea" rows="5"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-tags">Tags (comma-separated, optional)</label>
+                        <input type="text" id="item-tags" class="input" placeholder="e.g., poison,dc15">
+                    </div>
+                    <div class="form-group">
+                        <label for="item-metadata">Metadata (key=value pairs, comma-separated, optional)</label>
+                        <input type="text" id="item-metadata" class="input" placeholder="e.g., dc_disable=15,damage=1d10">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Item Modal -->
+    <div id="view-item-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="view-item-title">Item Details</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="item-details">
+                    <!-- Item details will be loaded here -->
+                </div>
+                <div class="form-actions">
+                    <button id="edit-item-btn" class="btn btn-primary">Edit Item</button>
+                    <button class="btn btn-secondary modal-close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Dungeon Modal -->
+    <div id="edit-dungeon-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Edit Dungeon</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-dungeon-form">
+                    <input type="hidden" id="edit-dungeon-old-name">
+                    <div class="form-group">
+                        <label for="edit-dungeon-name">Dungeon Name</label>
+                        <input type="text" id="edit-dungeon-name" class="input" placeholder="Leave empty to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-dungeon-summary">Summary</label>
+                        <textarea id="edit-dungeon-summary" class="input textarea" rows="3" placeholder="Leave empty to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <p style="color: var(--secondary-brown); font-size: 0.9em;">
+                            <strong>Note:</strong> At least one field must be updated. Leave fields empty to keep their current values.
+                        </p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Update Dungeon</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Room Modal -->
+    <div id="edit-room-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Edit Room</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-room-form">
+                    <input type="hidden" id="edit-room-dungeon-name">
+                    <input type="hidden" id="edit-room-old-name">
+                    <div class="form-group">
+                        <label for="edit-room-name">Room Name</label>
+                        <input type="text" id="edit-room-name" class="input" placeholder="Leave empty to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-room-summary">Summary</label>
+                        <textarea id="edit-room-summary" class="input textarea" rows="3" placeholder="Leave empty to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <p style="color: var(--secondary-brown); font-size: 0.9em;">
+                            <strong>Note:</strong> At least one field must be updated. Leave fields empty to keep their current values.
+                        </p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Update Room</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div id="edit-item-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Edit Item</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-item-form">
+                    <input type="hidden" id="edit-item-dungeon-name">
+                    <input type="hidden" id="edit-item-room-name">
+                    <input type="hidden" id="edit-item-category">
+                    <input type="hidden" id="edit-item-name">
+                    <div class="form-group">
+                        <label for="edit-item-summary">Summary</label>
+                        <input type="text" id="edit-item-summary" class="input" placeholder="Leave empty to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-item-notes">Notes (Markdown)</label>
+                        <textarea id="edit-item-notes" class="input textarea" rows="5" placeholder="Leave empty to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-item-tags">Tags (comma-separated)</label>
+                        <input type="text" id="edit-item-tags" class="input" placeholder="Leave empty to keep current value, e.g., poison,dc15">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-item-metadata">Metadata (key=value pairs, comma-separated)</label>
+                        <input type="text" id="edit-item-metadata" class="input" placeholder="Leave empty to keep current value, e.g., dc_disable=15,damage=1d10">
+                    </div>
+                    <div class="form-group">
+                        <p style="color: var(--secondary-brown); font-size: 0.9em;">
+                            <strong>Note:</strong> At least one field must be updated. Leave fields empty to keep their current values.
+                        </p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Update Item</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Login</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" class="input" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                        <button type="button" class="btn btn-secondary" id="show-register-btn">Register</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="register-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Register</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" class="input" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Register</button>
+                        <button type="button" class="btn btn-secondary" id="show-login-btn">Login</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirm Deletion</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin-bottom: 20px; color: var(--text-primary);"></p>
+                <div class="form-group">
+                    <p style="color: var(--secondary-brown); font-size: 0.9em; margin-bottom: 15px;">
+                        <strong>⚠ Warning:</strong> This action cannot be undone!
+                    </p>
+                    <label for="confirm-token">Type "DELETE" to confirm permanent deletion:</label>
+                    <input type="text" id="confirm-token" class="input" placeholder="Type DELETE here">
+                </div>
+                <div class="form-actions">
+                    <button id="confirm-yes" class="btn btn-danger">Delete</button>
+                    <button id="confirm-no" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Character Creation Modal -->
+    <div id="create-character-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Create New Character</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="character-creation-chat" style="height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; padding: 15px; margin-bottom: 15px; background: var(--bg-card);">
+                    <div id="chat-messages" style="min-height: 100%;">
+                        <div style="padding: 10px; color: var(--text-secondary);">
+                            <p><strong>Character Creation Assistant</strong></p>
+                            <p>I'll help you create a complete D&D 5e character following PHB rules!</p>
+                            <p>Tell me what you'd like to create, or ask me to guide you through the process.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="character-chat-input" class="input" placeholder="Type your message here..." style="width: 100%;">
+                </div>
+                <div class="form-actions">
+                    <button id="character-chat-send" class="btn btn-primary">Send</button>
+                    <button id="character-save-btn" class="btn btn-secondary" style="display: none;">Save Character</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Character Modal -->
+    <div id="view-character-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="view-character-title">Character Details</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="character-details" style="white-space: pre-wrap; font-family: 'Crimson Text', serif; line-height: 1.6;">
+                    <!-- Character details will be loaded here -->
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-secondary modal-close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+

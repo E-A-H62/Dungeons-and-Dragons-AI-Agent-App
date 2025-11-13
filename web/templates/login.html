@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - D&D Dungeon Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .login-card {
+            background: var(--gradient-card);
+            border: 2px solid var(--accent-gold);
+            border-radius: 16px;
+            padding: 48px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 8px 32px var(--shadow-lg), 0 0 0 1px var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(0, 188, 212, 0.03) 10px,
+                rgba(0, 188, 212, 0.03) 20px
+            );
+            animation: slide 20s linear infinite;
+        }
+
+        .login-header {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-title {
+            font-family: 'Cinzel', serif;
+            font-size: 2.5em;
+            color: var(--accent-gold);
+            text-shadow: 2px 2px 8px var(--shadow-lg);
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+            font-weight: 700;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+            margin-top: 8px;
+        }
+
+        .login-tabs {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .login-tab {
+            flex: 1;
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text-secondary);
+            font-family: 'Crimson Text', serif;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .login-tab:hover {
+            color: var(--accent-gold);
+        }
+
+        .login-tab.active {
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+        }
+
+        .login-form-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-form {
+            display: none;
+        }
+
+        .login-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1em;
+        }
+
+        .input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-family: 'Crimson Text', serif;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px var(--shadow-gold);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Crimson Text', serif;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .btn-primary {
+            background: var(--gradient-header);
+            color: var(--accent-gold);
+            border: 2px solid var(--accent-gold);
+            box-shadow: 0 4px 12px var(--shadow-md);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-gold);
+            color: var(--dark-brown);
+            box-shadow: 0 6px 20px var(--shadow-gold);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: var(--error);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .theme-toggle-login {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: transparent;
+            border: 2px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: var(--accent-gold);
+            font-family: 'Crimson Text', serif;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .theme-toggle-login:hover {
+            background: var(--accent-gold);
+            color: var(--dark-brown);
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle-login" id="theme-toggle" aria-label="Toggle theme">
+        <span id="theme-toggle-text">Light</span>
+    </button>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1 class="login-title">Dungeon Manager</h1>
+                <p class="login-subtitle">Enter Your Realm</p>
+            </div>
+
+            <div class="login-tabs">
+                <button class="login-tab active" id="login-tab-btn" data-form="login">Login</button>
+                <button class="login-tab" id="register-tab-btn" data-form="register">Register</button>
+            </div>
+
+            <div class="error-message" id="error-message"></div>
+
+            <div class="login-form-container">
+                <!-- Login Form -->
+                <form class="login-form active" id="login-form">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" class="input" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" class="input" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enter Dungeon</button>
+                </form>
+
+                <!-- Register Form -->
+                <form class="login-form" id="register-form">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" class="input" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" class="input" required autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password-confirm">Confirm Password</label>
+                        <input type="password" id="register-password-confirm" class="input" required autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        // Theme management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            document.getElementById('theme-toggle-text').textContent = theme === 'dark' ? 'Dark' : 'Light';
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+        }
+
+        // Tab switching
+        function switchTab(formType) {
+            // Update tabs
+            document.querySelectorAll('.login-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(`${formType}-tab-btn`).classList.add('active');
+
+            // Update forms
+            document.querySelectorAll('.login-form').forEach(form => {
+                form.classList.remove('active');
+            });
+            document.getElementById(`${formType}-form`).classList.add('active');
+
+            // Clear error message
+            hideError();
+        }
+
+        document.getElementById('login-tab-btn').addEventListener('click', () => switchTab('login'));
+        document.getElementById('register-tab-btn').addEventListener('click', () => switchTab('register'));
+
+        // Error message handling
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            setTimeout(() => hideError(), 5000);
+        }
+
+        function hideError() {
+            document.getElementById('error-message').classList.remove('show');
+        }
+
+        // Login function
+        async function login(username, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    // Redirect to main application
+                    window.location.href = '/';
+                } else {
+                    showError(data.message || 'Login failed');
+                }
+            } catch (error) {
+                showError('Login failed: ' + error.message);
+            }
+        }
+
+        // Register function
+        async function register(username, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    // Auto-login and redirect
+                    window.location.href = '/';
+                } else {
+                    showError(data.message || 'Registration failed');
+                }
+            } catch (error) {
+                showError('Registration failed: ' + error.message);
+            }
+        }
+
+        // Form handlers
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            
+            if (!username || !password) {
+                showError('Please enter both username and password');
+                return;
+            }
+            
+            await login(username, password);
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            const username = document.getElementById('register-username').value.trim();
+            const password = document.getElementById('register-password').value;
+            const passwordConfirm = document.getElementById('register-password-confirm').value;
+            
+            if (!username || !password) {
+                showError('Please enter both username and password');
+                return;
+            }
+            
+            if (password !== passwordConfirm) {
+                showError('Passwords do not match');
+                return;
+            }
+            
+            if (password.length < 3) {
+                showError('Password must be at least 3 characters long');
+                return;
+            }
+            
+            await register(username, password);
+        });
+
+        // Theme toggle
+        document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+        // Initialize theme on load
+        initTheme();
+
+        // Check if already authenticated
+        (async () => {
+            try {
+                const response = await fetch(`${API_BASE}/auth/check`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                // Not authenticated, stay on login page
+            }
+        })();
+    </script>
+</body>
+</html>
+
