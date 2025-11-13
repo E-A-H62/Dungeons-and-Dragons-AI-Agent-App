@@ -4,14 +4,14 @@ A beautiful, D&D-themed web interface for managing your dungeons, rooms, items, 
 
 ## Features
 
-- 🏰 **Dungeon Management**: Create, rename, update, and delete dungeons
-- 🚪 **Room Management**: Organize rooms within dungeons
-- 📦 **Item Management**: Manage puzzles, traps, treasures, and enemies
-- 🔍 **Search**: Search across all items with filters and tags
-- 📜 **Export/Import**: Export dungeons as JSON and import them back
-- 👤 **User Authentication**: Secure user accounts with session management
-- 🎭 **Character Creation**: AI-powered D&D 5e character creation agent
-- 💾 **Character Management**: Save and manage your created characters
+- **Dungeon Management**: Create, rename, update, and delete dungeons
+- **Room Management**: Organize rooms within dungeons
+- **Item Management**: Manage puzzles, traps, treasures, and enemies
+- **Search**: Search across all items with filters and tags
+- **Export/Import**: Export dungeons as JSON and import them back
+- **User Authentication**: Secure user accounts with session management
+- **Character Creation**: AI-powered D&D 5e character creation agent
+- **Character Management**: Save and manage your created characters
 
 ## Setup
 
