@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
 Script to check MongoDB user permissions.
+
 Run this to verify what operations your MongoDB user can perform.
+This is useful for troubleshooting index creation issues or permission errors.
+Tests read, write, update, delete, and index creation permissions.
 """
 
 import os

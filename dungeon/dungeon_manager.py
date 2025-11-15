@@ -3,6 +3,10 @@ D&D Dungeon Organizer - MongoDB-Backed File-System Manager
 
 A Python implementation for managing dungeons, rooms, and items
 (puzzles, traps, treasures, enemies) using MongoDB.
+
+This module provides a high-level API that wraps the low-level mongo_fs
+operations and converts MongoDB result envelopes into simple return values
+or raises appropriate exceptions.
 """
 
 from typing import Optional, List, Dict
@@ -14,17 +18,17 @@ from core import mongo_fs as mf
 # ============================================================================
 
 class NotFoundError(Exception):
-    """Raised when a requested resource is not found."""
+    """Raised when a requested resource is not found in the database."""
     pass
 
 
 class ConflictError(Exception):
-    """Raised when an operation conflicts with existing data."""
+    """Raised when an operation conflicts with existing data (e.g., duplicate name)."""
     pass
 
 
 class UnsafeOperationError(Exception):
-    """Raised when an unsafe operation lacks proper confirmation."""
+    """Raised when a destructive operation lacks proper confirmation token."""
     pass
 
 
@@ -33,7 +37,12 @@ class UnsafeOperationError(Exception):
 # ============================================================================
 
 def _extract_result(mongo_result: dict) -> dict:
-    """Extract the actual result data from MongoDB result envelope."""
+    """
+    Extract the actual result data from MongoDB result envelope.
+    
+    Converts MongoDB error codes into appropriate Python exceptions
+    for cleaner error handling in the high-level API.
+    """
     if mongo_result["status"] == "error":
         code = mongo_result.get("code", "ERROR")
         message = mongo_result.get("message", "Unknown error")
@@ -96,7 +105,12 @@ def _extract_item_info(mongo_result: dict) -> dict:
 # --- Dungeons ---
 
 def create_dungeon(*, name: str, summary: Optional[str] = None, exists_ok: bool = False, user_id: Optional[str] = None) -> dict:
-    """Create a new dungeon."""
+    """
+    Create a new dungeon.
+    
+    Returns a dictionary with dungeon info (name, summary, deleted status).
+    Raises ConflictError if dungeon already exists (unless exists_ok=True).
+    """
     result = mf.create_dungeon(name=name, summary=summary, exists_ok=exists_ok, user_id=user_id, raw="")
     return _extract_dungeon_info(result)
 
@@ -122,7 +136,12 @@ def update_dungeon(*, dungeon: str, patch: dict, user_id: Optional[str] = None) 
 
 
 def delete_dungeon(*, dungeon: str, confirm_token: Optional[str] = None, user_id: Optional[str] = None) -> None:
-    """Delete a dungeon (permanent deletion with confirmation required)."""
+    """
+    Delete a dungeon (permanent deletion with confirmation required).
+    
+    This is a hard delete - permanently removes the dungeon and all
+    associated rooms and items. Requires confirmation token to prevent accidents.
+    """
     result = mf.delete_dungeon(dungeon=dungeon, token=confirm_token, user_id=user_id, raw="")
     if result["status"] == "error":
         code = result.get("code", "ERROR")
@@ -282,7 +301,11 @@ def move_item(
     dst_dungeon: str, dst_room: str, dst_category: str,
     overwrite: bool = False, user_id: Optional[str] = None
 ) -> dict:
-    """Move an item from one location to another."""
+    """
+    Move an item from one location to another (copies then deletes source).
+    
+    If overwrite=False and destination exists, raises ConflictError.
+    """
     result = mf.move_item(
         src_dungeon=src_dungeon, src_room=src_room, src_category=src_category, item=item,
         dst_dungeon=dst_dungeon, dst_room=dst_room, dst_category=dst_category,
@@ -298,7 +321,12 @@ def copy_item(
     dst_dungeon: str, dst_room: str, dst_category: str,
     new_name: Optional[str] = None, overwrite: bool = False, user_id: Optional[str] = None
 ) -> dict:
-    """Copy an item from one location to another."""
+    """
+    Copy an item from one location to another.
+    
+    If new_name is provided, the copy will have that name.
+    Otherwise, uses the original item name.
+    """
     result = mf.copy_item(
         src_dungeon=src_dungeon, src_room=src_room, src_category=src_category, item=item,
         dst_dungeon=dst_dungeon, dst_room=dst_room, dst_category=dst_category,
@@ -379,14 +407,26 @@ def search(*, query: str, dungeon: Optional[str] = None, tags_any: Optional[List
 
 
 def export_dungeon(*, dungeon: str, user_id: Optional[str] = None) -> dict:
-    """Export a dungeon as a deep copy dictionary."""
+    """
+    Export a dungeon as a deep copy dictionary (JSON-serializable).
+    
+    Includes all rooms and items organized hierarchically.
+    Useful for backup or sharing between users.
+    """
     result = mf.export_dungeon(dungeon=dungeon, user_id=user_id, raw="")
     data = _extract_result(result)
     return data.get("dungeon", {})
 
 
 def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str] = None) -> dict:
-    """Import a dungeon from a dictionary."""
+    """
+    Import a dungeon from a dictionary (from export_dungeon).
+    
+    Strategy options:
+    - "skip": Don't import if dungeon name already exists
+    - "overwrite": Delete existing dungeon and import new one
+    - "rename": Import with a new name (adds -2, -3, etc. suffix)
+    """
     result = mf.import_dungeon(data=data, strategy=strategy, user_id=user_id, raw="")
     dungeon_data = _extract_result(result)
     dungeon_info = dungeon_data.get("dungeon", {})

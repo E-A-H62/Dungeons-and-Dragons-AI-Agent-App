@@ -23,6 +23,10 @@ load_dotenv()
 # ============================================================================
 
 # PHB Classes with their features
+# Contains all 12 core classes from D&D 5e Player's Handbook with:
+# - Hit dice, saving throw proficiencies, skill choices
+# - Starting equipment options
+# - Class features by level
 PHB_CLASSES = {
     "Barbarian": {
         "hit_die": "d12",
@@ -689,6 +693,8 @@ ALIGNMENTS = [
 # CHARACTER DATA MODEL
 # ============================================================================
 
+# Global character data structure (used by agent tools)
+# This stores the current character being created in a session
 character_data: Dict[str, Any] = {
     "name": None,
     "class": None,
@@ -752,6 +758,7 @@ character_data: Dict[str, Any] = {
 # ============================================================================
 
 # Point buy cost table for 27-point variant
+# Each ability score from 8-15 has an associated point cost
 POINT_BUY_COSTS = {
     8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
 }
@@ -879,6 +886,10 @@ def get_species_speed(species: str, subspecies: str = None) -> int:
 # ============================================================================
 # LANGCHAIN TOOLS
 # ============================================================================
+
+# These functions are decorated with @tool to make them available to the
+# LangChain agent. The agent can call these tools to perform character
+# creation operations based on user input.
 
 @tool
 def roll_ability_scores() -> str:
@@ -1559,7 +1570,13 @@ def export_character_markdown(filename: str = None) -> str:
 
 
 def create_agent() -> AgentExecutor:
-    """Create and configure the LangChain agent with all tools."""
+    """
+    Create and configure the LangChain agent with all character creation tools.
+    
+    Sets up the OpenAI LLM, defines all available tools, and creates
+    the agent executor with a system prompt that guides the character
+    creation workflow.
+    """
     
     # Check for API key
     api_key = os.getenv("OPENAI_API_KEY")

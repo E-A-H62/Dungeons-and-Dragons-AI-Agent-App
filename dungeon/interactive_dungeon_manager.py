@@ -322,7 +322,12 @@ def collect_parameters(func_name: str, param_list: List[str]) -> Dict[str, Any]:
 
 
 def call_openai_for_dsl(client: OpenAI, action: str, params: Dict[str, Any]) -> Optional[str]:
-    """Call OpenAI API to generate DSL code."""
+    """
+    Call OpenAI API to generate DSL code from user action and parameters.
+    
+    Uses GPT-4o-mini to convert high-level operations into DSL commands
+    that can be executed by the dungeon management system.
+    """
     prompt = f"""You are a DSL code generator for a D&D dungeon management system.
 
 Given the following DSL specifications:
@@ -544,7 +549,12 @@ def main():
 
 
 def construct_dsl_manually(func_name: str, params: Dict[str, Any]) -> Optional[str]:
-    """Fallback: manually construct DSL code when OpenAI is not available."""
+    """
+    Fallback: manually construct DSL code when OpenAI is not available.
+    
+    This is a basic implementation that only handles simple cases.
+    For complex operations, OpenAI generation is recommended.
+    """
     # This is a basic implementation - only handles simple cases
     try:
         if func_name == "create_dungeon":

@@ -31,6 +31,12 @@ CORS(app, supports_credentials=True)
 
 # Ensure MongoDB indexes on startup
 def setup_indexes():
+    """
+    Initialize MongoDB indexes when the application starts.
+    
+    Creates indexes for dungeons, rooms, items, characters, and users
+    to ensure uniqueness constraints and improve query performance.
+    """
     try:
         ensure_indexes()
         ensure_users_index()
@@ -38,7 +44,7 @@ def setup_indexes():
     except Exception as e:
         print(f"⚠ Warning: Could not ensure MongoDB indexes: {e}")
 
-# Setup indexes when module is imported
+# Setup indexes when module is imported (runs on server startup)
 setup_indexes()
 
 
@@ -605,11 +611,18 @@ def import_dungeon():
 # Character Management Routes
 # ============================================================================
 
-# Store agent sessions per user/character
+# Store agent sessions per user/character (in-memory, not persistent)
+# Each session maintains its own LangChain agent and chat history
 _agent_sessions = {}
 
 def get_agent_session(session_id: str, user_id: str):
-    """Get or create an agent session for character creation."""
+    """
+    Get or create an agent session for character creation.
+    
+    Sessions are stored in memory and allow multiple users to create
+    characters simultaneously. Each session has its own character data
+    and conversation history.
+    """
     if session_id not in _agent_sessions:
         # Create a new agent executor
         agent_executor = create_agent()
@@ -777,7 +790,12 @@ def delete_character(character_id):
 @app.route('/api/characters/agent/chat', methods=['POST'])
 @require_auth
 def agent_chat():
-    """Interact with the character creation agent."""
+    """
+    Interact with the character creation agent.
+    
+    Sends a message to the LangChain agent and returns the response.
+    Maintains conversation history within the session.
+    """
     try:
         user_id = get_current_user_id()
         data = request.json
@@ -827,7 +845,13 @@ def agent_chat():
 @app.route('/api/characters/agent/save', methods=['POST'])
 @require_auth
 def save_character():
-    """Save the current character from a session to the database."""
+    """
+    Save the current character from a session to the database.
+    
+    Validates that the character has a name and doesn't already exist,
+    then saves both the character data and formatted character sheet.
+    Cleans up the session after saving.
+    """
     try:
         user_id = get_current_user_id()
         data = request.json

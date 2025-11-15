@@ -1,3 +1,10 @@
+"""
+MongoDB-backed file system operations for dungeon management.
+
+This module provides low-level database operations for dungeons, rooms, and items.
+All functions return standardized result dictionaries with status, code, and data.
+"""
+
 import time
 from datetime import datetime
 from typing import Optional, List, Dict, Union
@@ -5,12 +12,26 @@ from pymongo.errors import DuplicateKeyError
 from .db import db, utcnow
 from .result_format import make_result, start_timer
 
+# Valid item categories (fixed set)
 CATEGORIES = ("puzzles", "traps", "treasures", "enemies")
 
 
 # ---------- DUNGEONS ----------
 
 def create_dungeon(*, name: str, summary: Optional[str] = None, exists_ok: bool = False, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """
+    Create a new dungeon in the database.
+    
+    Args:
+        name: Unique dungeon name (per user)
+        summary: Optional description
+        exists_ok: If True, return existing dungeon instead of error
+        user_id: Owner of the dungeon (required)
+        raw: Original command string (for tracking)
+    
+    Returns:
+        Standardized result dictionary with dungeon data
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -67,6 +88,7 @@ def create_dungeon(*, name: str, summary: Optional[str] = None, exists_ok: bool 
 
 
 def list_dungeons(*, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """List all non-deleted dungeons for a user."""
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -86,6 +108,12 @@ def list_dungeons(*, user_id: Optional[str] = None, raw: str = "") -> dict:
 
 
 def rename_dungeon(*, dungeon: str, new_name: str, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """
+    Rename a dungeon and cascade the change to all related rooms and items.
+    
+    Note: This updates the dungeon name in rooms and items collections
+    since they store dungeon name as a string field.
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -203,6 +231,12 @@ def update_dungeon(*, dungeon: str, patch: dict, user_id: Optional[str] = None, 
 
 
 def delete_dungeon(*, dungeon: str, token: Optional[str] = None, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """
+    Permanently delete a dungeon and all its rooms and items (hard delete).
+    
+    Requires confirmation token to prevent accidental deletion.
+    This is a cascading delete - removes dungeon, rooms, and items.
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -244,6 +278,7 @@ def delete_dungeon(*, dungeon: str, token: Optional[str] = None, user_id: Option
 # ---------- ROOMS ----------
 
 def create_room(*, dungeon: str, name: str, summary: Optional[str] = None, exists_ok: bool = False, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """Create a new room within a dungeon."""
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -482,6 +517,13 @@ def delete_room(*, dungeon: str, room: str, token: Optional[str] = None, user_id
 def create_item(
     *, dungeon: str, room: str, category: str, payload: dict, exists_ok: bool = False, user_id: Optional[str] = None, raw: str = ""
 ) -> dict:
+    """
+    Create a new item (puzzle, trap, treasure, or enemy) in a room.
+    
+    Args:
+        payload: Dictionary containing item data (name, summary, notes_md, tags, metadata)
+        category: Must be one of: puzzles, traps, treasures, enemies
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -961,6 +1003,12 @@ def list_category_items(*, dungeon: str, room: str, category: str, user_id: Opti
 # ---------- UTILITIES ----------
 
 def search(*, query: str, dungeon: Optional[str] = None, tags_any: Optional[List[str]] = None, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """
+    Search for items by text query and optional tag filters.
+    
+    Searches item names and summaries (case-insensitive substring match).
+    If tags_any is provided, only returns items that have at least one matching tag.
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(

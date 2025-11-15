@@ -10,12 +10,21 @@ from core.db import db, utcnow
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256 (simple hashing for demo purposes)."""
+    """
+    Hash a password using SHA-256.
+    
+    Note: This is a simple hashing method for demo purposes.
+    In production, use bcrypt or similar with salt for better security.
+    """
     return hashlib.sha256(password.encode()).hexdigest()
 
 
 def create_user(username: str, password: str) -> dict:
-    """Create a new user account."""
+    """
+    Create a new user account.
+    
+    Returns error if username already exists, otherwise returns user_id.
+    """
     users_coll = db().users
     
     # Check if user already exists
@@ -35,7 +44,11 @@ def create_user(username: str, password: str) -> dict:
 
 
 def verify_user(username: str, password: str) -> dict:
-    """Verify user credentials and return user info."""
+    """
+    Verify user credentials by checking username and password hash.
+    
+    Returns user info if valid, error status if invalid.
+    """
     users_coll = db().users
     user = users_coll.find_one({"username": username})
     
@@ -64,7 +77,11 @@ def get_current_username():
 
 
 def require_auth(f):
-    """Decorator to require authentication for a route."""
+    """
+    Flask decorator to require authentication for a route.
+    
+    Checks for user_id in session and returns 401 if not authenticated.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user_id = get_current_user_id()

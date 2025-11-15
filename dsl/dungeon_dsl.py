@@ -127,7 +127,12 @@ def _map_error_to_code(error: Exception) -> str:
 
 
 def tokenize(line: str) -> list[str]:
-    """Tokenize a line, handling quoted strings properly."""
+    """
+    Tokenize a DSL command line, handling quoted strings properly.
+    
+    Supports both single and double quotes, and preserves spaces within quotes.
+    This allows field values with spaces to be properly parsed.
+    """
     tokens = []
     current = ""
     in_quotes = False
@@ -178,7 +183,12 @@ def tokenize(line: str) -> list[str]:
 
 
 def parse_value(value: str):
-    """Parse a value, handling booleans, None, and JSON structures."""
+    """
+    Parse a value string, handling booleans, None, and JSON structures.
+    
+    Converts string representations like "true", "false", "null" to Python types.
+    Also attempts JSON parsing for lists and dictionaries.
+    """
     value = value.strip()
     
     # Boolean literals
@@ -217,7 +227,13 @@ def parse_metadata(meta_str: str) -> dict:
 
 
 def parse_field_args(args: list[str]) -> dict:
-    """Parse field arguments like summary=..., tags=..., meta=..."""
+    """
+    Parse field arguments like summary=..., tags=..., meta=...
+    
+    Handles both positional arguments (for backward compatibility) and
+    named field assignments. If any field assignments are found, treats
+    remaining unassigned args as part of quoted values that were split.
+    """
     fields = {}
     i = 0
     # Track if we've seen any field assignments (with =) to avoid treating unassigned args as positional
@@ -260,7 +276,10 @@ def execute_command(line: str, output=None) -> Optional[Dict[str, Any]]:
     """
     Execute a single DSL command line.
     
-    Returns the standard result format, or None if no output (comments/empty lines).
+    Parses the command, calls the appropriate dungeon_manager function,
+    and returns a standardized result dictionary.
+    
+    Returns None for comments or empty lines.
     """
     if output is None:
         output = []
@@ -904,7 +923,9 @@ def execute_file(filepath: str, verbose: bool = True) -> Dict[str, Any]:
     """
     Execute a DSL script file line by line.
     
-    Returns a batch result envelope with all individual command results.
+    Processes each line as a command and collects all results.
+    Returns a batch result envelope with summary statistics and
+    all individual command results.
     """
     start_time = time.time()
     results = []

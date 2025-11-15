@@ -20,7 +20,12 @@ from dungeon.dungeon_manager import (
 
 
 def main():
-    """Run example usage demonstrations."""
+    """
+    Run example usage demonstrations.
+    
+    Shows how to use the dungeon manager API to create dungeons, rooms,
+    items, search, export/import, and perform other operations.
+    """
     print("=" * 60)
     print("D&D Dungeon Organizer - Example Usage")
     print("=" * 60)

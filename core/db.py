@@ -1,3 +1,10 @@
+"""
+Database connection and utility functions for MongoDB.
+
+This module provides a centralized database connection and helper functions
+for working with MongoDB in the D&D Dungeon Manager application.
+"""
+
 import os
 from datetime import datetime
 from pymongo import MongoClient, ASCENDING
@@ -6,18 +13,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# MongoDB connection configuration from environment variables
 _MONGO_URI = os.environ["MONGODB_URI"]
 _DB_NAME = os.environ.get("DB_NAME", "dnd_dungeon")
 
+# Initialize MongoDB client and database connection (singleton pattern)
 _client = MongoClient(_MONGO_URI)
 _db = _client[_DB_NAME]
 
 
 def db():
+    """Return the MongoDB database instance."""
     return _db
 
 
 def utcnow():
+    """Get current UTC datetime (used for timestamps in database documents)."""
     return datetime.utcnow()
 
 
