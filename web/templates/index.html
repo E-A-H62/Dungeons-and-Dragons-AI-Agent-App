@@ -484,7 +484,133 @@
                     <!-- Character details will be loaded here -->
                 </div>
                 <div class="form-actions">
+                    <button id="edit-character-btn" class="btn btn-primary">Edit Character</button>
                     <button class="btn btn-secondary modal-close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Character Modal -->
+    <div id="edit-character-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="edit-character-title">Edit Character</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs for Manual Edit and Agent Chat -->
+                <div class="edit-tabs" style="display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px;">
+                    <button class="edit-tab active" data-tab="manual" style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 1em; color: var(--text-secondary); transition: all 0.2s;">
+                        Manual Edit
+                    </button>
+                    <button class="edit-tab" data-tab="agent" style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 1em; color: var(--text-secondary); transition: all 0.2s;">
+                        Agent Chat
+                    </button>
+                </div>
+
+                <!-- Manual Edit Tab -->
+                <div id="manual-edit-tab" class="edit-tab-content active">
+                    <form id="manual-edit-character-form">
+                        <input type="hidden" id="edit-character-id">
+                        <div class="form-group">
+                            <label for="edit-char-name">Character Name</label>
+                            <input type="text" id="edit-char-name" class="input" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-class">Class</label>
+                            <input type="text" id="edit-char-class" class="input">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-level">Level</label>
+                            <input type="number" id="edit-char-level" class="input" min="1" max="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-species">Species</label>
+                            <input type="text" id="edit-char-species" class="input">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-subspecies">Subspecies</label>
+                            <input type="text" id="edit-char-subspecies" class="input">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-background">Background</label>
+                            <input type="text" id="edit-char-background" class="input">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-alignment">Alignment</label>
+                            <input type="text" id="edit-char-alignment" class="input">
+                        </div>
+                        <div class="form-group">
+                            <label>Ability Scores</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                <div>
+                                    <label for="edit-char-str" style="font-size: 0.9em;">Strength</label>
+                                    <input type="number" id="edit-char-str" class="input" min="1" max="30">
+                                </div>
+                                <div>
+                                    <label for="edit-char-dex" style="font-size: 0.9em;">Dexterity</label>
+                                    <input type="number" id="edit-char-dex" class="input" min="1" max="30">
+                                </div>
+                                <div>
+                                    <label for="edit-char-con" style="font-size: 0.9em;">Constitution</label>
+                                    <input type="number" id="edit-char-con" class="input" min="1" max="30">
+                                </div>
+                                <div>
+                                    <label for="edit-char-int" style="font-size: 0.9em;">Intelligence</label>
+                                    <input type="number" id="edit-char-int" class="input" min="1" max="30">
+                                </div>
+                                <div>
+                                    <label for="edit-char-wis" style="font-size: 0.9em;">Wisdom</label>
+                                    <input type="number" id="edit-char-wis" class="input" min="1" max="30">
+                                </div>
+                                <div>
+                                    <label for="edit-char-cha" style="font-size: 0.9em;">Charisma</label>
+                                    <input type="number" id="edit-char-cha" class="input" min="1" max="30">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-hit-points">Hit Points</label>
+                            <input type="number" id="edit-char-hit-points" class="input" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-armor-class">Armor Class</label>
+                            <input type="number" id="edit-char-armor-class" class="input" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-speed">Speed</label>
+                            <input type="number" id="edit-char-speed" class="input" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-char-backstory">Backstory</label>
+                            <textarea id="edit-char-backstory" class="input textarea" rows="4"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Agent Chat Tab -->
+                <div id="agent-edit-tab" class="edit-tab-content" style="display: none;">
+                    <div id="edit-character-creation-chat" style="height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; padding: 15px; margin-bottom: 15px; background: var(--bg-card);">
+                        <div id="edit-chat-messages" style="min-height: 100%;">
+                            <div style="padding: 10px; color: var(--text-secondary);">
+                                <p><strong>Character Editing Assistant</strong></p>
+                                <p>I'll help you edit your character! You can ask me to change any field, or I can suggest improvements.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="edit-character-chat-input" class="input" placeholder="Type your message here..." style="width: 100%;">
+                    </div>
+                    <div class="form-actions">
+                        <button id="edit-character-chat-send" class="btn btn-primary">Send</button>
+                        <button id="edit-character-save-btn" class="btn btn-secondary" style="display: none;">Save Changes</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>

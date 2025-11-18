@@ -617,81 +617,92 @@ def import_dungeon():
 # Each session maintains its own LangChain agent and chat history
 _agent_sessions = {}
 
-def get_agent_session(session_id: str, user_id: str):
+def get_agent_session(session_id: str, user_id: str, initial_character_data: dict = None):
     """
-    Get or create an agent session for character creation.
+    Get or create an agent session for character creation or editing.
     
     Sessions are stored in memory and allow multiple users to create
     characters simultaneously. Each session has its own character data
     and conversation history.
+    
+    Args:
+        session_id: Unique session identifier
+        user_id: User ID for authorization
+        initial_character_data: Optional existing character data to load (for editing)
     """
     if session_id not in _agent_sessions:
         # Create a new agent executor
         agent_executor = create_agent()
         # Initialize character data for this session
         # character_data is already imported at the top of the file
-        session_character_data = {
-            "name": None,
-            "class": None,
-            "level": 1,
-            "species": None,
-            "subspecies": None,
-            "background": None,
-            "alignment": None,
-            "experience_points": 0,
-            "ability_scores": {
-                "Strength": None,
-                "Dexterity": None,
-                "Constitution": None,
-                "Intelligence": None,
-                "Wisdom": None,
-                "Charisma": None
-            },
-            "ability_modifiers": {
-                "Strength": None,
-                "Dexterity": None,
-                "Constitution": None,
-                "Intelligence": None,
-                "Wisdom": None,
-                "Charisma": None
-            },
-            "saving_throw_proficiencies": [],
-            "skill_proficiencies": [],
-            "armor_proficiencies": [],
-            "weapon_proficiencies": [],
-            "tool_proficiencies": [],
-            "language_proficiencies": [],
-            "passive_perception": None,
-            "passive_investigation": None,
-            "passive_insight": None,
-            "armor_class": None,
-            "initiative": None,
-            "speed": None,
-            "hit_points": None,
-            "hit_dice": None,
-            "equipment": [],
-            "personality_trait": None,
-            "ideal": None,
-            "bond": None,
-            "flaw": None,
-            "background_feature": None,
-            "class_features": [],
-            "subclass": None,
-            "species_traits": [],
-            "age": None,
-            "height": None,
-            "weight": None,
-            "eyes": None,
-            "skin": None,
-            "hair": None,
-            "backstory": None,
-            "generation_method": None
-        }
+        if initial_character_data:
+            # Use provided character data (for editing)
+            session_character_data = initial_character_data.copy()
+        else:
+            # Initialize empty character data (for creation)
+            session_character_data = {
+                "name": None,
+                "class": None,
+                "level": 1,
+                "species": None,
+                "subspecies": None,
+                "background": None,
+                "alignment": None,
+                "experience_points": 0,
+                "ability_scores": {
+                    "Strength": None,
+                    "Dexterity": None,
+                    "Constitution": None,
+                    "Intelligence": None,
+                    "Wisdom": None,
+                    "Charisma": None
+                },
+                "ability_modifiers": {
+                    "Strength": None,
+                    "Dexterity": None,
+                    "Constitution": None,
+                    "Intelligence": None,
+                    "Wisdom": None,
+                    "Charisma": None
+                },
+                "saving_throw_proficiencies": [],
+                "skill_proficiencies": [],
+                "armor_proficiencies": [],
+                "weapon_proficiencies": [],
+                "tool_proficiencies": [],
+                "language_proficiencies": [],
+                "passive_perception": None,
+                "passive_investigation": None,
+                "passive_insight": None,
+                "armor_class": None,
+                "initiative": None,
+                "speed": None,
+                "hit_points": None,
+                "hit_dice": None,
+                "equipment": [],
+                "personality_trait": None,
+                "ideal": None,
+                "bond": None,
+                "flaw": None,
+                "background_feature": None,
+                "class_features": [],
+                "subclass": None,
+                "species_traits": [],
+                "age": None,
+                "height": None,
+                "weight": None,
+                "eyes": None,
+                "skin": None,
+                "hair": None,
+                "backstory": None,
+                "generation_method": None
+            }
         _agent_sessions[session_id] = {
             "agent_executor": agent_executor,
             "chat_history": [],
             "character_data": session_character_data,
-            "user_id": user_id
+            "user_id": user_id,
+            "character_id": None  # Will be set when editing an existing character
         }
     return _agent_sessions[session_id]
 
@@ -762,10 +773,10 @@ def get_character(character_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route('/api/characters/<character_id>', methods=['DELETE'])
+@app.route('/api/characters/<character_id>', methods=['PATCH'])
 @require_auth
-def delete_character(character_id):
-    """Delete a character (soft delete)."""
+def update_character(character_id):
+    """Update a character's data manually."""
     try:
         user_id = get_current_user_id()
         try:
@@ -773,15 +784,94 @@ def delete_character(character_id):
         except:
             return jsonify({"status": "error", "message": "Invalid character ID"}), 400
         
+        # Check if character exists and belongs to user
+        character = db().characters.find_one(
+            {"_id": obj_id, "user_id": user_id, "deleted": False}
+        )
+        
+        if not character:
+            return jsonify({"status": "error", "message": "Character not found"}), 404
+        
+        data = request.json
+        patch = data.get('patch', {})
+        
+        if not patch:
+            return jsonify({"status": "error", "message": "Patch data is required"}), 400
+        
+        # Update character_data with patch
+        char_data = character.get("character_data", {}).copy()
+        char_data.update(patch)
+        
+        # Regenerate character sheet
+        original_character_data = character_data.copy()
+        character_data.clear()
+        character_data.update(char_data)
+        
+        try:
+            character_sheet = _generate_character_sheet()
+        finally:
+            character_data.clear()
+            character_data.update(original_character_data)
+        
+        # Update in database
+        update_doc = {
+            "character_data": char_data,
+            "character_sheet": character_sheet,
+            "updated_at": utcnow()
+        }
+        
+        # Update name if provided
+        if "name" in patch:
+            update_doc["name"] = patch["name"]
+        
         result = db().characters.update_one(
             {"_id": obj_id, "user_id": user_id, "deleted": False},
-            {"$set": {"deleted": True, "deleted_at": utcnow()}}
+            {"$set": update_doc}
         )
         
         if result.matched_count == 0:
             return jsonify({"status": "error", "message": "Character not found"}), 404
         
-        return jsonify({"status": "ok", "message": "Character deleted"})
+        # Fetch updated character
+        updated_character = db().characters.find_one(
+            {"_id": obj_id, "user_id": user_id, "deleted": False},
+            {"user_id": 0, "deleted": 0}
+        )
+        updated_character["_id"] = str(updated_character["_id"])
+        
+        return jsonify({"status": "ok", "character": updated_character})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/characters/<character_id>', methods=['DELETE'])
+@require_auth
+def delete_character(character_id):
+    """Delete a character (hard delete - permanently removes from database)."""
+    try:
+        user_id = get_current_user_id()
+        try:
+            obj_id = ObjectId(character_id)
+        except:
+            return jsonify({"status": "error", "message": "Invalid character ID"}), 400
+        
+        # First verify the character exists and belongs to the user
+        character = db().characters.find_one(
+            {"_id": obj_id, "user_id": user_id, "deleted": False}
+        )
+        
+        if not character:
+            return jsonify({"status": "error", "message": "Character not found"}), 404
+        
+        # Permanently delete the character from the database
+        result = db().characters.delete_one(
+            {"_id": obj_id, "user_id": user_id}
+        )
+        
+        if result.deleted_count == 0:
+            return jsonify({"status": "error", "message": "Character not found"}), 404
+        
+        return jsonify({"status": "ok", "message": "Character permanently deleted"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -850,6 +940,8 @@ def save_character():
     Validates that the character has a name and doesn't already exist,
     then saves both the character data and formatted character sheet.
     Cleans up the session after saving.
+    
+    If character_id is set in the session, updates the existing character instead.
     """
     try:
         user_id = get_current_user_id()
@@ -867,17 +959,10 @@ def save_character():
             return jsonify({"status": "error", "message": "Unauthorized"}), 403
         
         char_data = session["character_data"]
+        character_id = session.get("character_id")
         
         if not char_data.get("name"):
             return jsonify({"status": "error", "message": "Character must have a name"}), 400
-        
-        # Check if character with this name already exists
-        existing = db().characters.find_one(
-            {"user_id": user_id, "name": char_data["name"], "deleted": False}
-        )
-        
-        if existing:
-            return jsonify({"status": "error", "message": f"Character '{char_data['name']}' already exists"}), 409
         
         # Get character sheet
         original_character_data = character_data.copy()
@@ -890,26 +975,227 @@ def save_character():
             character_data.clear()
             character_data.update(original_character_data)
         
-        # Save to database
-        character_doc = {
-            "user_id": user_id,
-            "name": char_data["name"],
-            "character_data": char_data,
-            "character_sheet": character_sheet,
-            "created_at": utcnow(),
-            "updated_at": utcnow(),
-            "deleted": False
-        }
+        if character_id:
+            # Update existing character
+            try:
+                obj_id = ObjectId(character_id)
+            except:
+                return jsonify({"status": "error", "message": "Invalid character ID"}), 400
+            
+            # Check if character exists and belongs to user
+            existing = db().characters.find_one(
+                {"_id": obj_id, "user_id": user_id, "deleted": False}
+            )
+            
+            if not existing:
+                return jsonify({"status": "error", "message": "Character not found"}), 404
+            
+            # Check if name changed and conflicts with another character
+            if char_data["name"] != existing.get("name"):
+                name_conflict = db().characters.find_one(
+                    {"user_id": user_id, "name": char_data["name"], "deleted": False, "_id": {"$ne": obj_id}}
+                )
+                if name_conflict:
+                    return jsonify({"status": "error", "message": f"Character '{char_data['name']}' already exists"}), 409
+            
+            # Update character
+            result = db().characters.update_one(
+                {"_id": obj_id, "user_id": user_id, "deleted": False},
+                {"$set": {
+                    "name": char_data["name"],
+                    "character_data": char_data,
+                    "character_sheet": character_sheet,
+                    "updated_at": utcnow()
+                }}
+            )
+            
+            if result.matched_count == 0:
+                return jsonify({"status": "error", "message": "Character not found"}), 404
+            
+            # Clean up session
+            del _agent_sessions[session_id]
+            
+            return jsonify({
+                "status": "ok",
+                "character_id": character_id,
+                "message": "Character updated successfully"
+            })
+        else:
+            # Create new character
+            # Check if character with this name already exists
+            existing = db().characters.find_one(
+                {"user_id": user_id, "name": char_data["name"], "deleted": False}
+            )
+            
+            if existing:
+                return jsonify({"status": "error", "message": f"Character '{char_data['name']}' already exists"}), 409
+            
+            # Save to database
+            character_doc = {
+                "user_id": user_id,
+                "name": char_data["name"],
+                "character_data": char_data,
+                "character_sheet": character_sheet,
+                "created_at": utcnow(),
+                "updated_at": utcnow(),
+                "deleted": False
+            }
+            
+            result = db().characters.insert_one(character_doc)
+            
+            # Clean up session
+            del _agent_sessions[session_id]
+            
+            return jsonify({
+                "status": "ok",
+                "character_id": str(result.inserted_id),
+                "message": "Character saved successfully"
+            })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _generate_character_context_message(char_data: dict) -> str:
+    """
+    Generate a context message describing the character for the agent.
+    
+    This message is added to the chat history when starting an edit session
+    so the agent knows what character it's editing.
+    """
+    context_parts = []
+    
+    # Basic info
+    if char_data.get("name"):
+        context_parts.append(f"Character Name: {char_data['name']}")
+    
+    if char_data.get("class"):
+        level = char_data.get("level", 1)
+        context_parts.append(f"Class & Level: {char_data['class']} {level}")
+    
+    if char_data.get("species"):
+        species = char_data["species"]
+        if char_data.get("subspecies"):
+            species = f"{char_data['subspecies']} {species}"
+        context_parts.append(f"Species: {species}")
+    
+    if char_data.get("background"):
+        context_parts.append(f"Background: {char_data['background']}")
+    
+    if char_data.get("alignment"):
+        context_parts.append(f"Alignment: {char_data['alignment']}")
+    
+    # Ability scores
+    scores = char_data.get("ability_scores", {})
+    if any(scores.values()):
+        ability_strs = []
+        for ability in ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]:
+            score = scores.get(ability)
+            if score is not None:
+                mod = char_data.get("ability_modifiers", {}).get(ability)
+                if mod is not None:
+                    mod_str = f"+{mod}" if mod >= 0 else str(mod)
+                    ability_strs.append(f"{ability[:3]}: {score} ({mod_str})")
+        if ability_strs:
+            context_parts.append(f"Ability Scores: {' '.join(ability_strs)}")
+    
+    # Combat stats
+    combat_stats = []
+    if char_data.get("hit_points") is not None:
+        hp = char_data["hit_points"]
+        hit_dice = char_data.get("hit_dice", "")
+        combat_stats.append(f"HP: {hp} {hit_dice}".strip())
+    if char_data.get("armor_class") is not None:
+        combat_stats.append(f"AC: {char_data['armor_class']}")
+    if char_data.get("speed"):
+        combat_stats.append(f"Speed: {char_data['speed']} ft")
+    if combat_stats:
+        context_parts.append(f"Combat Stats: {', '.join(combat_stats)}")
+    
+    # Skills and proficiencies
+    if char_data.get("skill_proficiencies"):
+        context_parts.append(f"Skill Proficiencies: {', '.join(char_data['skill_proficiencies'])}")
+    
+    if char_data.get("language_proficiencies"):
+        context_parts.append(f"Languages: {', '.join(char_data['language_proficiencies'])}")
+    
+    # Personality traits
+    if char_data.get("personality_trait"):
+        context_parts.append(f"Personality Trait: {char_data['personality_trait']}")
+    if char_data.get("ideal"):
+        context_parts.append(f"Ideal: {char_data['ideal']}")
+    if char_data.get("bond"):
+        context_parts.append(f"Bond: {char_data['bond']}")
+    if char_data.get("flaw"):
+        context_parts.append(f"Flaw: {char_data['flaw']}")
+    
+    # Backstory
+    if char_data.get("backstory"):
+        context_parts.append(f"Backstory: {char_data['backstory']}")
+    
+    if not context_parts:
+        return "I'm ready to help you edit this character. The character data is currently minimal."
+    
+    context_message = "I'm ready to help you edit this character. Here's the current character information:\n\n" + "\n".join(context_parts)
+    context_message += "\n\nWhat would you like to change or add to this character?"
+    
+    return context_message
+
+
+@app.route('/api/characters/<character_id>/agent/edit', methods=['POST'])
+@require_auth
+def start_character_edit(character_id):
+    """
+    Start an agent session for editing an existing character.
+    
+    Loads the character data into a new agent session so the user
+    can edit it using the agent chat interface. Adds an initial
+    context message to the chat history so the agent knows what
+    character it's editing.
+    """
+    try:
+        user_id = get_current_user_id()
+        try:
+            obj_id = ObjectId(character_id)
+        except:
+            return jsonify({"status": "error", "message": "Invalid character ID"}), 400
         
-        result = db().characters.insert_one(character_doc)
+        # Get character from database
+        character = db().characters.find_one(
+            {"_id": obj_id, "user_id": user_id, "deleted": False}
+        )
         
-        # Clean up session
-        del _agent_sessions[session_id]
+        if not character:
+            return jsonify({"status": "error", "message": "Character not found"}), 404
+        
+        # Create new session with existing character data
+        session_id = str(uuid.uuid4())
+        char_data = character.get("character_data", {})
+        
+        # Initialize session with existing character data
+        session = get_agent_session(session_id, user_id, initial_character_data=char_data)
+        session["character_id"] = character_id
+        
+        # Add initial context message to chat history so agent knows what character it's editing
+        # This is added as an AIMessage so the agent recognizes it as context it has already provided
+        context_message = _generate_character_context_message(char_data)
+        session["chat_history"].append(AIMessage(content=context_message))
+        
+        # Generate character sheet for reference
+        original_character_data = character_data.copy()
+        character_data.clear()
+        character_data.update(char_data)
+        
+        try:
+            character_sheet = _generate_character_sheet()
+        finally:
+            character_data.clear()
+            character_data.update(original_character_data)
         
         return jsonify({
             "status": "ok",
-            "character_id": str(result.inserted_id),
-            "message": "Character saved successfully"
+            "session_id": session_id,
+            "character_data": char_data,
+            "initial_message": context_message
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

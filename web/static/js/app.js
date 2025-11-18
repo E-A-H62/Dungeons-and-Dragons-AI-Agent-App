@@ -1364,6 +1364,43 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentCharacterSessionId = null;
         }
     });
+    
+    // Character editing event listeners
+    document.getElementById('edit-character-btn').addEventListener('click', () => {
+        if (currentViewingCharacterId) {
+            openEditCharacter(currentViewingCharacterId);
+        }
+    });
+    
+    // Edit tab switching
+    document.querySelectorAll('.edit-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            switchEditTab(tab.dataset.tab);
+        });
+    });
+    
+    // Manual edit form
+    document.getElementById('manual-edit-character-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitManualEdit();
+    });
+    
+    // Agent edit chat
+    document.getElementById('edit-character-chat-send').addEventListener('click', sendEditCharacterMessage);
+    document.getElementById('edit-character-chat-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendEditCharacterMessage();
+        }
+    });
+    document.getElementById('edit-character-save-btn').addEventListener('click', saveEditCharacter);
+    
+    // Reset edit session when modal closes
+    document.getElementById('edit-character-modal').addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal') || e.target.classList.contains('modal-close')) {
+            currentEditCharacterSessionId = null;
+            currentEditCharacterId = null;
+        }
+    });
 });
 
 // Character Management Functions
@@ -1725,12 +1762,15 @@ async function saveCurrentCharacter() {
     }
 }
 
+let currentViewingCharacterId = null;
+
 async function viewCharacter(characterId) {
     try {
         showLoading();
         const data = await apiCall(`/characters/${characterId}`);
         
         const character = data.character;
+        currentViewingCharacterId = characterId;
         document.getElementById('view-character-title').textContent = character.name || 'Character Details';
         
         // Display character sheet if available, otherwise show character data
@@ -1802,5 +1842,395 @@ async function deleteCharacterConfirm(characterId, characterName) {
     };
     
     showModal('confirm-modal');
+}
+
+// Character Editing Functions
+let currentEditCharacterId = null;
+let currentEditCharacterSessionId = null;
+
+async function openEditCharacter(characterId) {
+    currentEditCharacterId = characterId;
+    
+    try {
+        showLoading();
+        const data = await apiCall(`/characters/${characterId}`);
+        const character = data.character;
+        const charData = character.character_data || {};
+        
+        // Populate manual edit form
+        document.getElementById('edit-character-id').value = characterId;
+        document.getElementById('edit-char-name').value = charData.name || '';
+        document.getElementById('edit-char-class').value = charData.class || '';
+        document.getElementById('edit-char-level').value = charData.level || 1;
+        document.getElementById('edit-char-species').value = charData.species || '';
+        document.getElementById('edit-char-subspecies').value = charData.subspecies || '';
+        document.getElementById('edit-char-background').value = charData.background || '';
+        document.getElementById('edit-char-alignment').value = charData.alignment || '';
+        document.getElementById('edit-char-str').value = charData.ability_scores?.Strength || '';
+        document.getElementById('edit-char-dex').value = charData.ability_scores?.Dexterity || '';
+        document.getElementById('edit-char-con').value = charData.ability_scores?.Constitution || '';
+        document.getElementById('edit-char-int').value = charData.ability_scores?.Intelligence || '';
+        document.getElementById('edit-char-wis').value = charData.ability_scores?.Wisdom || '';
+        document.getElementById('edit-char-cha').value = charData.ability_scores?.Charisma || '';
+        document.getElementById('edit-char-hit-points').value = charData.hit_points || '';
+        document.getElementById('edit-char-armor-class').value = charData.armor_class || '';
+        document.getElementById('edit-char-speed').value = charData.speed || '';
+        document.getElementById('edit-char-backstory').value = charData.backstory || '';
+        
+        // Reset agent chat tab
+        currentEditCharacterSessionId = null;
+        const editChatMessages = document.getElementById('edit-chat-messages');
+        editChatMessages.innerHTML = `
+            <div style="padding: 10px; color: var(--text-secondary);">
+                <p><strong>Character Editing Assistant</strong></p>
+                <p>I'll help you edit your character! You can ask me to change any field, or I can suggest improvements.</p>
+                <p>What would you like to change?</p>
+            </div>
+        `;
+        document.getElementById('edit-character-save-btn').style.display = 'none';
+        document.getElementById('edit-character-chat-input').value = '';
+        
+        // Switch to manual edit tab by default
+        switchEditTab('manual');
+        
+        // Close view modal and open edit modal
+        hideModal('view-character-modal');
+        showModal('edit-character-modal');
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function switchEditTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.edit-tab').forEach(tab => {
+        if (tab.dataset.tab === tabName) {
+            tab.classList.add('active');
+            tab.style.borderBottomColor = 'var(--accent-gold)';
+            tab.style.color = 'var(--text-primary)';
+        } else {
+            tab.classList.remove('active');
+            tab.style.borderBottomColor = 'transparent';
+            tab.style.color = 'var(--text-secondary)';
+        }
+    });
+    
+    // Update tab content
+    document.getElementById('manual-edit-tab').style.display = tabName === 'manual' ? 'block' : 'none';
+    document.getElementById('agent-edit-tab').style.display = tabName === 'agent' ? 'block' : 'none';
+    
+    // Initialize agent session if switching to agent tab
+    if (tabName === 'agent' && !currentEditCharacterSessionId && currentEditCharacterId) {
+        startAgentEditSession(currentEditCharacterId);
+    }
+}
+
+async function startAgentEditSession(characterId) {
+    try {
+        showLoading();
+        const data = await apiCall(`/characters/${characterId}/agent/edit`, {
+            method: 'POST'
+        });
+        currentEditCharacterSessionId = data.session_id;
+        
+        // Display the initial context message from the agent
+        // This message contains all the character information so the agent knows what it's editing
+        if (data.initial_message) {
+            addEditChatMessage('assistant', data.initial_message);
+        } else {
+            // Fallback if initial message not provided
+            const charData = data.character_data;
+            if (charData && charData.name) {
+                addEditChatMessage('assistant', `I'm ready to help you edit ${charData.name}! What would you like to change?`);
+            }
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function submitManualEdit() {
+    const characterId = document.getElementById('edit-character-id').value;
+    if (!characterId) {
+        showToast('Character ID is missing', 'error');
+        return;
+    }
+    
+    const patch = {};
+    
+    // Collect all form values
+    const name = document.getElementById('edit-char-name').value.trim();
+    if (name) patch.name = name;
+    
+    const classVal = document.getElementById('edit-char-class').value.trim();
+    if (classVal) patch.class = classVal;
+    
+    const level = document.getElementById('edit-char-level').value;
+    if (level) patch.level = parseInt(level);
+    
+    const species = document.getElementById('edit-char-species').value.trim();
+    if (species) patch.species = species;
+    
+    const subspecies = document.getElementById('edit-char-subspecies').value.trim();
+    if (subspecies) patch.subspecies = subspecies;
+    
+    const background = document.getElementById('edit-char-background').value.trim();
+    if (background) patch.background = background;
+    
+    const alignment = document.getElementById('edit-char-alignment').value.trim();
+    if (alignment) patch.alignment = alignment;
+    
+    // Ability scores
+    const str = document.getElementById('edit-char-str').value;
+    const dex = document.getElementById('edit-char-dex').value;
+    const con = document.getElementById('edit-char-con').value;
+    const int = document.getElementById('edit-char-int').value;
+    const wis = document.getElementById('edit-char-wis').value;
+    const cha = document.getElementById('edit-char-cha').value;
+    
+    if (str || dex || con || int || wis || cha) {
+        patch.ability_scores = {};
+        if (str) patch.ability_scores.Strength = parseInt(str);
+        if (dex) patch.ability_scores.Dexterity = parseInt(dex);
+        if (con) patch.ability_scores.Constitution = parseInt(con);
+        if (int) patch.ability_scores.Intelligence = parseInt(int);
+        if (wis) patch.ability_scores.Wisdom = parseInt(wis);
+        if (cha) patch.ability_scores.Charisma = parseInt(cha);
+    }
+    
+    const hitPoints = document.getElementById('edit-char-hit-points').value;
+    if (hitPoints) patch.hit_points = parseInt(hitPoints);
+    
+    const armorClass = document.getElementById('edit-char-armor-class').value;
+    if (armorClass) patch.armor_class = parseInt(armorClass);
+    
+    const speed = document.getElementById('edit-char-speed').value;
+    if (speed) patch.speed = parseInt(speed);
+    
+    const backstory = document.getElementById('edit-char-backstory').value.trim();
+    if (backstory) patch.backstory = backstory;
+    
+    if (Object.keys(patch).length === 0) {
+        showToast('No changes to save', 'error');
+        return;
+    }
+    
+    try {
+        showLoading();
+        await apiCall(`/characters/${characterId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ patch })
+        });
+        showToast('Character updated successfully!', 'success');
+        hideModal('edit-character-modal');
+        await loadCharacters();
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function sendEditCharacterMessage() {
+    const input = document.getElementById('edit-character-chat-input');
+    const message = input.value.trim();
+    
+    if (!message || !currentEditCharacterSessionId) {
+        return;
+    }
+    
+    input.value = '';
+    input.disabled = true;
+    document.getElementById('edit-character-chat-send').disabled = true;
+    
+    const messageId = addEditChatMessage('user', message, true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    updateEditMessageStatus(messageId, 'sent');
+    
+    const loadingId = showEditChatLoading();
+    
+    try {
+        const data = await apiCall('/characters/agent/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+                session_id: currentEditCharacterSessionId,
+                message: message
+            })
+        });
+        
+        removeEditChatLoading(loadingId);
+        addEditChatMessage('assistant', data.response);
+        
+        if (data.character_data && data.character_data.name) {
+            document.getElementById('edit-character-save-btn').style.display = 'inline-flex';
+        }
+        
+        const chatContainer = document.getElementById('edit-character-creation-chat');
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    } catch (error) {
+        removeEditChatLoading(loadingId);
+        updateEditMessageStatus(messageId, 'error');
+        showToast(error.message, 'error');
+        addEditChatMessage('error', `Error: ${error.message}`);
+    } finally {
+        input.disabled = false;
+        document.getElementById('edit-character-chat-send').disabled = false;
+        input.focus();
+    }
+}
+
+function addEditChatMessage(role, message, isSending = false) {
+    const chatMessages = document.getElementById('edit-chat-messages');
+    const messageDiv = document.createElement('div');
+    const messageId = 'edit-msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    messageDiv.id = messageId;
+    messageDiv.style.cssText = 'padding: 10px; margin-bottom: 10px; border-radius: 5px;';
+    
+    if (role === 'user') {
+        messageDiv.style.cssText += 'background: var(--accent-gold); color: var(--text-inverse); text-align: right; margin-left: 20%;';
+        if (isSending) {
+            messageDiv.innerHTML = `
+                <strong>You:</strong> ${escapeHtml(message)}
+                <span class="message-status sending" style="margin-left: 8px; opacity: 0.7; font-size: 0.85em;">
+                    <span class="sending-dot"></span><span class="sending-dot"></span><span class="sending-dot"></span>
+                </span>
+            `;
+        } else {
+            messageDiv.innerHTML = `<strong>You:</strong> ${escapeHtml(message)}`;
+        }
+    } else if (role === 'assistant') {
+        messageDiv.style.cssText += 'background: var(--bg-secondary); margin-right: 20%;';
+        let formattedMessage = escapeHtml(message);
+        formattedMessage = formattedMessage.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        formattedMessage = formattedMessage.replace(/\n/g, '<br>');
+        messageDiv.innerHTML = `<strong>Assistant:</strong><br>${formattedMessage}`;
+    } else if (role === 'error') {
+        messageDiv.style.cssText += 'background: var(--error); color: white;';
+        messageDiv.innerHTML = escapeHtml(message);
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    const chatContainer = document.getElementById('edit-character-creation-chat');
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    
+    return messageId;
+}
+
+function updateEditMessageStatus(messageId, status) {
+    const messageDiv = document.getElementById(messageId);
+    if (!messageDiv) return;
+    
+    const statusSpan = messageDiv.querySelector('.message-status');
+    
+    if (status === 'sent') {
+        if (statusSpan) {
+            statusSpan.remove();
+        }
+    } else if (status === 'error') {
+        if (statusSpan) {
+            statusSpan.className = 'message-status error';
+            statusSpan.innerHTML = '⚠';
+            statusSpan.style.opacity = '1';
+        }
+    }
+}
+
+function showEditChatLoading() {
+    const chatMessages = document.getElementById('edit-chat-messages');
+    const loadingDiv = document.createElement('div');
+    const loadingId = 'edit-chat-loading-' + Date.now();
+    loadingDiv.id = loadingId;
+    loadingDiv.style.cssText = 'padding: 10px; margin-bottom: 10px; border-radius: 5px; background: var(--bg-secondary); margin-right: 20%;';
+    loadingDiv.innerHTML = `
+        <strong>Assistant:</strong><br>
+        <span class="chat-loading-dots">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </span>
+    `;
+    
+    // Add CSS for animated dots if not already added
+    if (!document.getElementById('chat-loading-style')) {
+        const style = document.createElement('style');
+        style.id = 'chat-loading-style';
+        style.textContent = `
+            .chat-loading-dots {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 0;
+            }
+            .chat-loading-dots .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--text-secondary);
+                animation: chat-dot-pulse 1.4s infinite ease-in-out both;
+                display: inline-block;
+            }
+            .chat-loading-dots .dot:nth-child(1) {
+                animation-delay: 0s;
+            }
+            .chat-loading-dots .dot:nth-child(2) {
+                animation-delay: 0.2s;
+            }
+            .chat-loading-dots .dot:nth-child(3) {
+                animation-delay: 0.4s;
+            }
+            @keyframes chat-dot-pulse {
+                0%, 80%, 100% {
+                    transform: scale(0.8);
+                    opacity: 0.5;
+                }
+                40% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    chatMessages.appendChild(loadingDiv);
+    const chatContainer = document.getElementById('edit-character-creation-chat');
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return loadingId;
+}
+
+function removeEditChatLoading(loadingId) {
+    const loadingDiv = document.getElementById(loadingId);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+async function saveEditCharacter() {
+    if (!currentEditCharacterSessionId) {
+        showToast('No active edit session', 'error');
+        return;
+    }
+    
+    try {
+        showLoading();
+        const data = await apiCall('/characters/agent/save', {
+            method: 'POST',
+            body: JSON.stringify({
+                session_id: currentEditCharacterSessionId
+            })
+        });
+        
+        showToast('Character updated successfully!', 'success');
+        hideModal('edit-character-modal');
+        currentEditCharacterSessionId = null;
+        currentEditCharacterId = null;
+        await loadCharacters();
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
