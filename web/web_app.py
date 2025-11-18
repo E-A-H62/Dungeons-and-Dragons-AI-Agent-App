@@ -603,6 +603,8 @@ def import_dungeon():
         
         result = dm.import_dungeon(data=dungeon_data, strategy=strategy, user_id=user_id)
         return jsonify({"status": "ok", "dungeon": result})
+    except dm.ConflictError as e:
+        return jsonify({"status": "error", "message": str(e)}), 409
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -709,11 +711,8 @@ def list_characters():
         for char in characters:
             if "_id" in char:
                 char["_id"] = str(char["_id"])
-            # Convert datetime to ISO string if present
-            if "created_at" in char and hasattr(char["created_at"], "isoformat"):
-                char["created_at"] = char["created_at"].isoformat()
-            if "updated_at" in char and hasattr(char["updated_at"], "isoformat"):
-                char["updated_at"] = char["updated_at"].isoformat()
+            # created_at and updated_at are now stored as readable strings in 24-hour format
+            # No conversion needed - they're already strings
         
         return jsonify({"status": "ok", "characters": characters})
     except Exception as e:

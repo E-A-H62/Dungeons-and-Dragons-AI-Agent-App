@@ -319,7 +319,13 @@ def execute_command(line: str, output=None) -> Optional[Dict[str, Any]]:
                     from db import db
                     dungeon_doc = db().dungeons.find_one({"name": name, "deleted": False})
                     if dungeon_doc and "created_at" in dungeon_doc:
-                        created_at = dungeon_doc["created_at"].timestamp()
+                        ca = dungeon_doc["created_at"]
+                        # Handle string format (new) or datetime (legacy)
+                        if isinstance(ca, str):
+                            dt = datetime.strptime(ca, "%Y-%m-%d %H:%M:%S")
+                            created_at = dt.timestamp()
+                        elif isinstance(ca, datetime):
+                            created_at = ca.timestamp()
                 except:
                     pass
                 

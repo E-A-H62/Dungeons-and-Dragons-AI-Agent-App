@@ -991,13 +991,26 @@ async function importDungeon() {
     try {
         const dungeonData = JSON.parse(jsonText);
         const strategy = document.getElementById('import-strategy').value;
+        const originalName = dungeonData.name;
         
         showLoading();
-        await apiCall('/dungeons/import', {
+        const response = await apiCall('/dungeons/import', {
             method: 'POST',
             body: JSON.stringify({ dungeon: dungeonData, strategy })
         });
-        showToast('Dungeon imported successfully!', 'success');
+        
+        // Show different messages based on import action
+        const importAction = response.dungeon?.import_action || 'imported';
+        const finalName = response.dungeon?.name || originalName;
+        
+        if (importAction === 'skipped') {
+            showToast(`Import skipped: A dungeon named "${originalName}" already exists.`, 'info');
+        } else if (importAction === 'renamed') {
+            showToast(`Dungeon imported as "${finalName}" (renamed from "${originalName}")`, 'success');
+        } else {
+            showToast(`Dungeon "${finalName}" imported successfully!`, 'success');
+        }
+        
         document.getElementById('import-data').value = '';
         await loadDungeons();
     } catch (error) {

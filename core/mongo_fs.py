@@ -16,6 +16,20 @@ from .result_format import make_result, start_timer
 CATEGORIES = ("puzzles", "traps", "treasures", "enemies")
 
 
+def _to_timestamp(ts_value):
+    """Convert created_at/updated_at value (string or datetime) to Unix timestamp."""
+    if isinstance(ts_value, str):
+        # Parse the formatted string "YYYY-MM-DD HH:MM:SS"
+        dt = datetime.strptime(ts_value, "%Y-%m-%d %H:%M:%S")
+        return dt.timestamp()
+    elif isinstance(ts_value, datetime):
+        # Handle legacy datetime objects
+        return ts_value.timestamp()
+    else:
+        # Already a timestamp or None
+        return ts_value
+
+
 # ---------- DUNGEONS ----------
 
 def create_dungeon(*, name: str, summary: Optional[str] = None, exists_ok: bool = False, user_id: Optional[str] = None, raw: str = "") -> dict:
@@ -78,8 +92,8 @@ def create_dungeon(*, name: str, summary: Optional[str] = None, exists_ok: bool 
         command={"raw": raw, "name": "dungeon.create", "args": {"name": name, "summary": summary, "exists_ok": exists_ok}},
         target={"type": "dungeon", "path": f"/{name}", "name": name},
         result={"dungeon": {"name": doc["name"], "summary": doc.get("summary"), "deleted": doc["deleted"],
-                            "created_at": doc["created_at"].timestamp(),
-                            "updated_at": doc["updated_at"].timestamp()}},
+                            "created_at": _to_timestamp(doc["created_at"]),
+                            "updated_at": _to_timestamp(doc["updated_at"])}},
         diff={"applied": code == "CREATED", "changes": (
             [{"op": "add", "path": "/", "node_type": "dungeon", "name": name}] if code == "CREATED" else []
         )},
@@ -634,8 +648,8 @@ def read_item(*, dungeon: str, room: str, category: str, item: str, user_id: Opt
             "notes_md": doc.get("notes_md"),
             "tags": doc.get("tags", []),
             "metadata": doc.get("metadata", {}),
-            "created_at": doc["created_at"].timestamp(),
-            "updated_at": doc["updated_at"].timestamp()
+            "created_at": _to_timestamp(doc["created_at"]),
+            "updated_at": _to_timestamp(doc["updated_at"])
         }},
         started=t0
     )
@@ -1205,8 +1219,8 @@ def export_dungeon(*, dungeon: str, user_id: Optional[str] = None, raw: str = ""
     # Build export structure
     export_data = {
         "name": dungeon_doc["name"],
-        "created_at": dungeon_doc["created_at"].timestamp(),
-        "updated_at": dungeon_doc["updated_at"].timestamp(),
+        "created_at": _to_timestamp(dungeon_doc["created_at"]),
+        "updated_at": _to_timestamp(dungeon_doc["updated_at"]),
         "deleted": dungeon_doc.get("deleted", False),
         "rooms": {}
     }
@@ -1216,8 +1230,8 @@ def export_dungeon(*, dungeon: str, user_id: Optional[str] = None, raw: str = ""
         export_data["rooms"][room_name] = {
             "name": room_doc["name"],
             "summary": room_doc.get("summary"),
-            "created_at": room_doc["created_at"].timestamp(),
-            "updated_at": room_doc["updated_at"].timestamp(),
+            "created_at": _to_timestamp(room_doc["created_at"]),
+            "updated_at": _to_timestamp(room_doc["updated_at"]),
             "deleted": room_doc.get("deleted", False),
             "categories": {
                 "puzzles": {},
@@ -1242,8 +1256,8 @@ def export_dungeon(*, dungeon: str, user_id: Optional[str] = None, raw: str = ""
             "notes_md": item_doc.get("notes_md"),
             "tags": item_doc.get("tags", []),
             "metadata": item_doc.get("metadata", {}),
-            "created_at": item_doc["created_at"].timestamp(),
-            "updated_at": item_doc["updated_at"].timestamp(),
+            "created_at": _to_timestamp(item_doc["created_at"]),
+            "updated_at": _to_timestamp(item_doc["updated_at"]),
             "deleted": item_doc.get("deleted", False)
         }
     
@@ -1274,16 +1288,23 @@ def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str]
             started=t0
         )
     
+    original_name = name  # Store original name for comparison
+    
+    # Validate strategy
+    if strategy not in ("skip", "rename"):
+        return make_result(
+            status="error", code="ERROR_VALIDATION",
+            message=f"Invalid strategy '{strategy}'. Valid strategies are: 'skip' (don't import if exists) or 'rename' (import with a new name).",
+            command={"raw": raw, "name": "import", "args": {"strategy": strategy}},
+            target={"type": "dungeon", "path": "/", "name": name or ""},
+            started=t0
+        )
+    
     coll_dungeons = db().dungeons
     existing = coll_dungeons.find_one({"name": name, "user_id": user_id, "deleted": False})
     
     if existing:
-        if strategy == "overwrite":
-            # Hard delete existing and recreate
-            coll_dungeons.delete_one({"_id": existing["_id"]})
-            db().rooms.delete_many({"dungeon": name, "user_id": user_id})
-            db().items.delete_many({"dungeon": name, "user_id": user_id})
-        elif strategy == "rename":
+        if strategy == "rename":
             i = 2
             new = f"{name}-{i}"
             while coll_dungeons.find_one({"name": new, "user_id": user_id, "deleted": False}):
@@ -1296,29 +1317,52 @@ def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str]
                 status="ok", code="NOOP", message="Dungeon exists; skipped.",
                 command={"raw": raw, "name": "import", "args": {"strategy": strategy}},
                 target={"type": "dungeon", "path": f"/{name}", "name": name},
-                result={"dungeon": {"name": name, "deleted": False}},
+                result={"dungeon": {"name": name, "deleted": False}, "import_action": "skipped", "original_name": original_name},
                 started=t0
             )
     
     # Import dungeon
+    # Convert timestamp to formatted string if needed
+    created_at = data.get("created_at")
+    if isinstance(created_at, (int, float)):
+        created_at = datetime.utcfromtimestamp(created_at).strftime("%Y-%m-%d %H:%M:%S")
+    elif not isinstance(created_at, str):
+        created_at = utcnow()
+    
     dungeon_doc = {
         "name": name,
         "user_id": user_id,
-        "created_at": datetime.fromtimestamp(data.get("created_at", time.time())) if isinstance(data.get("created_at"), (int, float)) else utcnow(),
+        "created_at": created_at,
         "updated_at": utcnow(),
         "deleted": data.get("deleted", False)
     }
-    coll_dungeons.insert_one(dungeon_doc)
+    try:
+        coll_dungeons.insert_one(dungeon_doc)
+    except DuplicateKeyError:
+        return make_result(
+            status="error", code="ERROR_CONFLICT",
+            message=f"A dungeon named '{name}' already exists. To resolve this, use one of these strategies: 'rename' (import with a new name) or 'skip' (don't import).",
+            command={"raw": raw, "name": "import", "args": {"strategy": strategy}},
+            target={"type": "dungeon", "path": f"/{name}", "name": name},
+            started=t0
+        )
     
     # Import rooms
     rooms_data = data.get("rooms", {})
     for room_name, room_data in rooms_data.items():
+        # Convert timestamp to formatted string if needed
+        room_created_at = room_data.get("created_at")
+        if isinstance(room_created_at, (int, float)):
+            room_created_at = datetime.utcfromtimestamp(room_created_at).strftime("%Y-%m-%d %H:%M:%S")
+        elif not isinstance(room_created_at, str):
+            room_created_at = utcnow()
+        
         room_doc = {
             "dungeon": name,
             "name": room_name,
             "user_id": user_id,
             "summary": room_data.get("summary"),
-            "created_at": datetime.fromtimestamp(room_data.get("created_at", time.time())) if isinstance(room_data.get("created_at"), (int, float)) else utcnow(),
+            "created_at": room_created_at,
             "updated_at": utcnow(),
             "deleted": room_data.get("deleted", False)
         }
@@ -1338,17 +1382,22 @@ def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str]
                     "notes_md": item_data.get("notes_md"),
                     "tags": list(item_data.get("tags", [])),
                     "metadata": dict(item_data.get("metadata", {})),
-                    "created_at": datetime.fromtimestamp(item_data.get("created_at", time.time())) if isinstance(item_data.get("created_at"), (int, float)) else utcnow(),
+                    "created_at": datetime.utcfromtimestamp(item_data.get("created_at", time.time())).strftime("%Y-%m-%d %H:%M:%S") if isinstance(item_data.get("created_at"), (int, float)) else (item_data.get("created_at") if isinstance(item_data.get("created_at"), str) else utcnow()),
                     "updated_at": utcnow(),
                     "deleted": item_data.get("deleted", False)
                 }
                 db().items.insert_one(item_doc)
     
+    # Determine import action
+    import_action = "imported"
+    if name != original_name:
+        import_action = "renamed"
+    
     return make_result(
         status="ok", code="IMPORTED", message="Dungeon imported.",
         command={"raw": raw, "name": "import", "args": {"strategy": strategy}},
         target={"type": "dungeon", "path": f"/{name}", "name": name},
-        result={"dungeon": {"name": name, "deleted": False}},
+        result={"dungeon": {"name": name, "deleted": False}, "import_action": import_action, "original_name": original_name},
         diff={"applied": True, "changes": [{"op": "add", "path": "/", "node_type": "dungeon", "name": name}]},
         started=t0
     )

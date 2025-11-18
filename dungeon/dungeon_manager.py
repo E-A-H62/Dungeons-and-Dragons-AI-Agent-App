@@ -424,7 +424,6 @@ def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str]
     
     Strategy options:
     - "skip": Don't import if dungeon name already exists
-    - "overwrite": Delete existing dungeon and import new one
     - "rename": Import with a new name (adds -2, -3, etc. suffix)
     """
     result = mf.import_dungeon(data=data, strategy=strategy, user_id=user_id, raw="")
@@ -433,7 +432,9 @@ def import_dungeon(*, data: dict, strategy: str = "skip", user_id: Optional[str]
     return {
         "type": "dungeon",
         "name": dungeon_info.get("name", ""),
-        "deleted": dungeon_info.get("deleted", False)
+        "deleted": dungeon_info.get("deleted", False),
+        "import_action": dungeon_data.get("import_action", "imported"),
+        "original_name": dungeon_data.get("original_name", dungeon_info.get("name", ""))
     }
 
 

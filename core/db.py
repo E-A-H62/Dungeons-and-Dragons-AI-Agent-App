@@ -28,8 +28,8 @@ def db():
 
 
 def utcnow():
-    """Get current UTC datetime (used for timestamps in database documents)."""
-    return datetime.utcnow()
+    """Get current UTC datetime as a readable string in 24-hour format (YYYY-MM-DD HH:MM:SS)."""
+    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def ensure_indexes():
