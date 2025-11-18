@@ -22,15 +22,29 @@ function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'i';
-    toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+    toast.innerHTML = `
+        <span style="flex: 1;">${message}</span>
+        <button class="toast-close" aria-label="Close" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; padding: 0; margin-left: 12px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s ease;">&times;</button>
+    `;
     
-    container.appendChild(toast);
-    
-    setTimeout(() => {
+    // Add click handler to close button
+    const closeButton = toast.querySelector('.toast-close');
+    closeButton.addEventListener('click', () => {
         toast.style.animation = 'toastSlideIn 0.3s ease reverse';
         setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    });
+    
+    // Add hover effect to close button
+    closeButton.addEventListener('mouseenter', () => {
+        closeButton.style.background = 'var(--bg-secondary)';
+        closeButton.style.color = 'var(--text-primary)';
+    });
+    closeButton.addEventListener('mouseleave', () => {
+        closeButton.style.background = 'none';
+        closeButton.style.color = 'var(--text-secondary)';
+    });
+    
+    container.appendChild(toast);
 }
 
 function showModal(modalId) {

@@ -275,15 +275,25 @@ def delete_dungeon(*, dungeon: str, token: Optional[str] = None, user_id: Option
             result={"confirm_required": True, "token_hint": expected},
             started=t0
         )
-    # Hard delete: remove dungeon, rooms, items
-    coll.delete_one({"_id": doc["_id"]})
-    db().rooms.delete_many({"dungeon": dungeon, "user_id": user_id})
-    db().items.delete_many({"dungeon": dungeon, "user_id": user_id})
+    # Cascade delete: remove all items first, then rooms, then dungeon
+    # This ensures proper cascade deletion in the database
+    items_deleted = db().items.delete_many({"dungeon": dungeon, "user_id": user_id})
+    rooms_deleted = db().rooms.delete_many({"dungeon": dungeon, "user_id": user_id})
+    dungeon_deleted = coll.delete_one({"_id": doc["_id"]})
+    
     return make_result(
-        status="ok", code="DELETED_HARD", message="Dungeon permanently deleted.",
+        status="ok", code="DELETED_HARD", 
+        message=f"Dungeon permanently deleted. Removed {rooms_deleted.deleted_count} room(s) and {items_deleted.deleted_count} item(s).",
         command={"raw": raw, "name": "dungeon.delete", "args": {"name": dungeon}},
         target={"type": "dungeon", "path": f"/{dungeon}", "name": dungeon},
-        result={"deleted": True, "hard": True},
+        result={
+            "deleted": True, 
+            "hard": True,
+            "cascade_deleted": {
+                "rooms": rooms_deleted.deleted_count,
+                "items": items_deleted.deleted_count
+            }
+        },
         diff={"applied": True, "changes": [{"op": "remove", "path": "/", "node_type": "dungeon", "name": dungeon}]},
         started=t0
     )
@@ -488,6 +498,12 @@ def update_room(*, dungeon: str, room: str, patch: dict, user_id: Optional[str] 
 
 
 def delete_room(*, dungeon: str, room: str, token: Optional[str] = None, user_id: Optional[str] = None, raw: str = "") -> dict:
+    """
+    Permanently delete a room and all its items (hard delete with cascade).
+    
+    Requires confirmation token to prevent accidental deletion.
+    This is a cascading delete - removes room and all items within it.
+    """
     t0 = start_timer()
     if not user_id:
         return make_result(
@@ -514,13 +530,23 @@ def delete_room(*, dungeon: str, room: str, token: Optional[str] = None, user_id
             result={"confirm_required": True, "token_hint": expected},
             started=t0
         )
-    coll.delete_one({"_id": doc["_id"]})
-    db().items.delete_many({"dungeon": dungeon, "room": room, "user_id": user_id})
+    # Cascade delete: remove all items in the room first, then the room
+    # This ensures proper cascade deletion in the database
+    items_deleted = db().items.delete_many({"dungeon": dungeon, "room": room, "user_id": user_id})
+    room_deleted = coll.delete_one({"_id": doc["_id"]})
+    
     return make_result(
-        status="ok", code="DELETED_HARD", message="Room permanently deleted.",
+        status="ok", code="DELETED_HARD", 
+        message=f"Room permanently deleted. Removed {items_deleted.deleted_count} item(s).",
         command={"raw": raw, "name": "room.delete", "args": {"dungeon": dungeon, "name": room}},
         target={"type": "room", "path": f"/{dungeon}/{room}", "name": room},
-        result={"deleted": True, "hard": True},
+        result={
+            "deleted": True, 
+            "hard": True,
+            "cascade_deleted": {
+                "items": items_deleted.deleted_count
+            }
+        },
         diff={"applied": True, "changes": [{"op": "remove", "path": f"/{dungeon}", "node_type": "room", "name": room}]},
         started=t0
     )
