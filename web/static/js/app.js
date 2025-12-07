@@ -92,6 +92,8 @@ async function checkAuth() {
         }
     } catch (error) {
         console.error('Auth check error:', error);
+        // Ensure loading is hidden on error
+        hideLoading();
         // Redirect to login page instead of showing modal
         window.location.href = '/login';
         return false;
@@ -101,12 +103,25 @@ async function checkAuth() {
 function updateAuthUI() {
     const userInfo = document.getElementById('user-info');
     const usernameDisplay = document.getElementById('username-display');
+    const logoutBtn = document.getElementById('logout-btn');
     
     if (isAuthenticated && currentUsername) {
-        userInfo.style.display = 'flex';
-        usernameDisplay.textContent = `Welcome, ${currentUsername}`;
+        if (userInfo) {
+            userInfo.style.display = 'flex';
+        }
+        if (usernameDisplay) {
+            usernameDisplay.textContent = `Welcome, ${currentUsername}`;
+        }
+        if (logoutBtn) {
+            logoutBtn.style.display = 'inline-block';
+        }
     } else {
-        userInfo.style.display = 'none';
+        if (userInfo) {
+            userInfo.style.display = 'none';
+        }
+        if (logoutBtn) {
+            logoutBtn.style.display = 'none';
+        }
     }
 }
 
@@ -207,6 +222,7 @@ async function apiCall(endpoint, options = {}) {
                 // Not authenticated, redirect to login page
                 isAuthenticated = false;
                 updateAuthUI();
+                hideLoading(); // Ensure loading is hidden
                 window.location.href = '/login';
             }
             throw new Error(data.message || 'An error occurred');
@@ -215,6 +231,7 @@ async function apiCall(endpoint, options = {}) {
         return data;
     } catch (error) {
         console.error('API Error:', error);
+        hideLoading(); // Ensure loading is hidden on error
         throw error;
     }
 }
@@ -1108,10 +1125,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
     
     // Check authentication status
-    const authenticated = await checkAuth();
-    if (authenticated) {
-        // Load dungeons if authenticated
-        loadDungeons();
+    try {
+        const authenticated = await checkAuth();
+        if (authenticated) {
+            // Load dungeons if authenticated
+            await loadDungeons();
+        }
+    } catch (error) {
+        console.error('Initialization error:', error);
+        hideLoading();
+        // If we're on the main page and auth fails, redirect to login
+        if (window.location.pathname === '/') {
+            window.location.href = '/login';
+        }
     }
     
     // Navigation
@@ -1345,8 +1371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateRoomSubmit();
     });
     
-    // Load initial data
-    loadDungeons();
+    // Initial data loading is handled in the checkAuth section above
     
     // Character management
     document.getElementById('create-character-btn').addEventListener('click', startCharacterCreation);

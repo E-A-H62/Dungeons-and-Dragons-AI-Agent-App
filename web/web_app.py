@@ -16,7 +16,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
 from core.db import ensure_indexes, db, utcnow
-from web.auth import create_user, verify_user, get_current_user_id, require_auth, ensure_users_index
+from web.auth import create_user, verify_user, get_current_user_id, get_current_username, require_auth, ensure_users_index
 from dungeon import dungeon_manager as dm
 from character.dnd_character_agent import create_agent, character_data, _generate_character_sheet
 from langchain_core.messages import HumanMessage, AIMessage
@@ -28,6 +28,14 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 CORS(app, supports_credentials=True)
+
+# Configure session for production
+# On Render, HTTPS is used, so we need secure cookies
+# Check if we're on Render (has RENDER env var) or explicitly set
+is_production = os.environ.get('RENDER') == 'true' or os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_SECURE'] = is_production
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Ensure MongoDB indexes on startup
 def setup_indexes():
@@ -109,7 +117,6 @@ def check_auth():
     """Check if user is authenticated."""
     user_id = get_current_user_id()
     if user_id:
-        from auth import get_current_username
         return jsonify({
             "status": "ok",
             "authenticated": True,
